@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockTerminal Pro — Real-Time AI Predictions</title>
+<meta name="description" content="AI-powered real-time stock market predictions with XGBoost machine learning and technical analysis">
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">ST</div>
+    <h1>Stock<span>Terminal</span> Pro</h1>
+  </div>
+  <div class="hdr-right">
+    <div id="marketBar" style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--t2)"></div>
+    <div class="hdr-info">
+      <div><span class="live-dot"></span>Real-Time</div>
+      <div id="hdrTicker" style="color:var(--blue);font-weight:700;font-family:'JetBrains Mono',monospace">—</div>
+    </div>
+    <div class="hdr-time" id="hdrTime">00:00:00</div>
+  </div>
+</div>
+
+<!-- Layout -->
+<div class="container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <!-- Watchlist Section -->
+    <div class="wl-section" id="wlSection">
+      <h3>⭐ Watchlist</h3>
+      <ul class="slist" id="wlList"></ul>
+      <div class="wl-empty" id="wlEmpty">Click ⭐ to add tickers</div>
+    </div>
+    <h3>📡 Live Tickers</h3>
+    <input class="search" id="sb" placeholder="Search ticker... (Ctrl+K)" oninput="filterS()">
+    <ul class="slist" id="slist">
+      {% for t in tickers %}
+      <li class="si" onclick="sel('{{t}}')" id="s-{{t}}">{{t}}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main" id="main">
+    <!-- Welcome Screen -->
+    <div class="welcome" id="welc">
+      <div class="welcome-icon">📊</div>
+      <h2>Real-Time AI Stock Analysis</h2>
+      <p>Select any ticker from the sidebar to get instant AI-powered predictions with live market data, technical analysis, and multi-day forecasts.</p>
+      <div style="margin-top:20px;display:flex;gap:8px">
+        <span class="tool-btn" style="cursor:default">⌨️ Shortcuts <span class="kbd">Ctrl+K</span> Search <span class="kbd">W</span> Watchlist <span class="kbd">E</span> Export</span>
+      </div>
+    </div>
+
+    <!-- Dashboard (hidden initially) -->
+    <div id="dash" style="display:none">
+
+      <!-- Toolbar -->
+      <div class="toolbar" id="toolbar">
+        <button class="wl-btn" id="wlToggle" onclick="toggleWatchlist()">⭐ Add to Watchlist</button>
+        <button class="tool-btn" onclick="exportCSV()">📥 Export CSV <span class="kbd">E</span></button>
+        <button class="tool-btn" onclick="sel(currentTicker)">🔄 Refresh <span class="kbd">R</span></button>
+        <div style="flex:1"></div>
+        <span class="price-meta" id="refreshTime">—</span>
+      </div>
+
+      <!-- Price Header -->
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <span id="priceTicker" style="font-size:14px;font-weight:700;color:var(--blue);font-family:'JetBrains Mono',monospace">—</span>
+            <span class="price-tag live" id="priceTag">● LIVE</span>
+          </div>
+          <div class="price-header">
+            <span class="price-main" id="priceMain">—</span>
+            <span class="price-change green" id="priceChange">—</span>
+          </div>
+          <div class="price-meta" id="priceMeta">—</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--t3);margin-top:4px">Auto-refresh: 30s</div>
+        </div>
+      </div>
+
+      <!-- AI Gauge + Overall Signal -->
+      <div class="card">
+        <div class="chtitle">🧠 AI Prediction Engine</div>
+        <div class="gauge-wrap">
+          <canvas id="gaugeCanvas" class="gauge-canvas" width="220" height="130"></canvas>
+          <div class="gauge-info">
+            <div class="gauge-score" id="gaugeVal">—</div>
+            <div class="gauge-label" id="gaugeLbl">AI Score</div>
+          </div>
+          <div style="text-align:center">
+            <div class="b-lbl">Signal</div>
+            <div class="b-val" id="bVal" style="font-size:22px">—</div>
+            <div class="csub" id="bProb" style="font-size:11px;margin-top:4px">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forecast Cards -->
+      <div class="forecast-row">
+        <div class="fc neutral" id="fc1d">
+          <div class="fc-period">📅 1-Day Forecast</div>
+          <div class="fc-arrow" id="fc1arrow">●</div>
+          <div class="fc-dir" id="fc1dir">—</div>
+          <div class="fc-conf" id="fc1conf">—</div>
+          <div class="fc-str" id="fc1str">—</div>
+          <div class="csub" id="fc1target" style="margin-top:6px;font-family:'JetBrains Mono',monospace">—</div>
+        </div>
+        <div class="fc neutral" id="fc5d">
+          <div class="fc-period">📊 5-Day Forecast</div>
+          <div class="fc-arrow" id="fc5arrow">●</div>
+          <div class="fc-dir" id="fc5dir">—</div>
+          <div class="fc-conf" id="fc5conf">—</div>
+          <div class="fc-str" id="fc5str">—</div>
+          <div class="csub" id="fc5target" style="margin-top:6px;font-family:'JetBrains Mono',monospace">—</div>
+        </div>
+        <div class="fc neutral" id="fc10d">
+          <div class="fc-period">📈 10-Day Forecast</div>
+          <div class="fc-arrow" id="fc10arrow">●</div>
+          <div class="fc-dir" id="fc10dir">—</div>
+          <div class="fc-conf" id="fc10conf">—</div>
+          <div class="fc-str" id="fc10str">—</div>
+          <div class="csub" id="fc10target" style="margin-top:6px;font-family:'JetBrains Mono',monospace">—</div>
+        </div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="mrow">
+        <div class="card"><div class="metric-icon">💰</div><div class="clbl">Last Close</div><div class="cval" id="mCl">—</div><div class="csub" id="mCh">—</div></div>
+        <div class="card"><div class="metric-icon">📊</div><div class="clbl">RSI (14)</div><div class="cval" id="mR">—</div><div class="csub" id="mRs">—</div></div>
+        <div class="card"><div class="metric-icon">📉</div><div class="clbl">MACD</div><div class="cval" id="mM">—</div><div class="csub" id="mMs">—</div></div>
+        <div class="card"><div class="metric-icon">🎯</div><div class="clbl">Trend Alignment</div><div class="cval" id="mT">—</div><div class="csub" id="mTs">—</div></div>
+      </div>
+
+      <!-- Support/Resistance + Price Targets -->
+      <div class="levels-grid">
+        <div class="card">
+          <div class="chtitle">🛡️ Support & Resistance</div>
+          <div class="level-row"><span class="level-label red">Resistance 2</span><span class="level-val red" id="lvR2">—</span></div>
+          <div class="level-row"><span class="level-label red">Resistance 1</span><span class="level-val red" id="lvR1">—</span></div>
+          <div class="level-row"><span class="level-label amber">Pivot Point</span><span class="level-val amber" id="lvPivot">—</span></div>
+          <div class="level-row"><span class="level-label green">Support 1</span><span class="level-val green" id="lvS1">—</span></div>
+          <div class="level-row"><span class="level-label green">Support 2</span><span class="level-val green" id="lvS2">—</span></div>
+        </div>
+        <div class="card">
+          <div class="chtitle">🎯 AI Price Targets</div>
+          <div class="level-row"><span class="level-label">1-Day Target</span><span class="level-val blue" id="pt1d">—</span></div>
+          <div class="level-row"><span class="level-label">5-Day Target</span><span class="level-val blue" id="pt5d">—</span></div>
+          <div class="level-row"><span class="level-label">10-Day Target</span><span class="level-val blue" id="pt10d">—</span></div>
+          <div style="margin-top:12px">
+            <div class="clbl">Bollinger Band Position</div>
+            <div class="bb-bar"><div class="bb-fill" id="bbFill" style="width:50%;background:var(--blue)"></div></div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px"><span class="csub">Oversold</span><span class="csub" id="bbVal">50%</span><span class="csub">Overbought</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="card">
+        <div class="chtitle">📈 Key Statistics</div>
+        <div class="stats-grid">
+          <div class="stat-item"><div class="stat-val green" id="st52H">—</div><div class="stat-lbl">52-Week High</div></div>
+          <div class="stat-item"><div class="stat-val red" id="st52L">—</div><div class="stat-lbl">52-Week Low</div></div>
+          <div class="stat-item"><div class="stat-val" id="stFromH">—</div><div class="stat-lbl">From 52W High</div></div>
+          <div class="stat-item"><div class="stat-val" id="stDayH">—</div><div class="stat-lbl">Day High</div></div>
+          <div class="stat-item"><div class="stat-val" id="stDayL">—</div><div class="stat-lbl">Day Low</div></div>
+          <div class="stat-item"><div class="stat-val" id="stAvgVol">—</div><div class="stat-lbl">Avg Volume (20d)</div></div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="chart-grid">
+        <div class="card"><div class="chtitle">📈 Price · Bollinger Bands · MAs <span style="color:var(--t3)" id="chTk"></span></div><canvas id="priceC" height="200"></canvas></div>
+        <div class="card"><div class="chtitle">📊 RSI Momentum</div><canvas id="rsiC" height="200"></canvas></div>
+      </div>
+
+      <!-- Volume Chart -->
+      <div class="card"><div class="chtitle">📦 Volume Analysis</div><canvas id="volC" height="120"></canvas></div>
+
+      <!-- Signal History Table -->
+      <div class="card">
+        <div class="chtitle">📋 Recent Price History</div>
+        <div style="max-height:350px;overflow-y:auto">
+          <table class="tbl">
+            <thead><tr><th>Date</th><th>Close</th><th>RSI</th><th>Change</th></tr></thead>
+            <tbody id="htb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
